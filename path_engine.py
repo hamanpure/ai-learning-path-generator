@@ -407,22 +407,111 @@ class ResourceFetcher:
         return mock_resources
     
     def _get_ai_resources(self, topic: str, difficulty: str) -> List[Dict[str, Any]]:
-        """Use OpenAI to generate resource recommendations (mock implementation)"""
-        # In a real implementation, this would call OpenAI API
-        # For now, return mock AI-generated resources
-        ai_resources = [
+        """Use OpenAI to generate resource recommendations with real links"""
+        if not self.openai_api_key:
+            # Fallback to mock resources if no API key
+            return self._get_mock_ai_resources(topic, difficulty)
+        
+        try:
+            from openai import OpenAI
+            client = OpenAI(api_key=self.openai_api_key)
+            
+            prompt = f"""
+            Generate 3 real, working educational resources for learning {topic} at {difficulty} level.
+            For each resource, provide:
+            1. Title of the course/tutorial
+            2. Brief description
+            3. Real, working URL (prefer free resources like YouTube, Khan Academy, freeCodeCamp, Coursera free courses, edX, etc.)
+            4. Provider name
+            5. Estimated hours to complete
+            6. Resource type (course, tutorial, documentation, etc.)
+            
+            Format as JSON array with these exact keys: title, description, url, provider, type, estimated_hours, rating
+            Make sure URLs are real and working. Prefer well-known educational platforms.
+            """
+            
+            response = client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=1000,
+                temperature=0.3
+            )
+            
+            # Parse the response
+            import json
+            content = response.choices[0].message.content
+            # Extract JSON from the response
+            start_idx = content.find('[')
+            end_idx = content.rfind(']') + 1
+            
+            if start_idx != -1 and end_idx != -1:
+                json_str = content[start_idx:end_idx]
+                ai_resources = json.loads(json_str)
+                
+                # Validate and clean the resources
+                validated_resources = []
+                for resource in ai_resources:
+                    if all(key in resource for key in ['title', 'description', 'url']):
+                        # Ensure all required fields exist with defaults
+                        validated_resource = {
+                            'title': resource['title'],
+                            'description': resource['description'],
+                            'url': resource['url'],
+                            'provider': resource.get('provider', 'Online Learning'),
+                            'type': resource.get('type', 'course'),
+                            'difficulty': difficulty,
+                            'rating': float(resource.get('rating', 4.2)),
+                            'estimated_hours': int(resource.get('estimated_hours', 20))
+                        }
+                        validated_resources.append(validated_resource)
+                
+                if validated_resources:
+                    logger.info(f"Generated {len(validated_resources)} AI resources for {topic}")
+                    return validated_resources
+            
+        except Exception as e:
+            logger.error(f"Error generating AI resources: {str(e)}")
+        
+        # Fallback to mock resources
+        return self._get_mock_ai_resources(topic, difficulty)
+    
+    def _get_mock_ai_resources(self, topic: str, difficulty: str) -> List[Dict[str, Any]]:
+        """Fallback mock AI resources when OpenAI is not available"""
+        # Generate realistic resource URLs based on topic
+        mock_resources = []
+        
+        # Define real educational platforms and their URL patterns
+        platforms = [
             {
-                "title": f"AI-Recommended {topic} Course",
-                "description": f"AI-curated learning path for {topic}",
-                "url": f"https://ai-learning.com/{topic.lower()}",
-                "provider": "AI Learning Platform",
-                "type": "course",
-                "difficulty": difficulty,
-                "rating": 4.4,
-                "estimated_hours": 25
+                "name": "freeCodeCamp",
+                "url_pattern": f"https://www.freecodecamp.org/learn/{topic.lower().replace(' ', '-')}",
+                "type": "tutorial"
+            },
+            {
+                "name": "Khan Academy", 
+                "url_pattern": f"https://www.khanacademy.org/computing/{topic.lower().replace(' ', '-')}",
+                "type": "course"
+            },
+            {
+                "name": "Coursera",
+                "url_pattern": f"https://www.coursera.org/search?query={topic.replace(' ', '%20')}",
+                "type": "course"
             }
         ]
-        return ai_resources
+        
+        for i, platform in enumerate(platforms):
+            mock_resources.append({
+                "title": f"{platform['name']} - {topic} {difficulty} Course",
+                "description": f"Comprehensive {difficulty.lower()} level {topic} course from {platform['name']}",
+                "url": platform["url_pattern"],
+                "provider": platform["name"],
+                "type": platform["type"],
+                "difficulty": difficulty,
+                "rating": 4.2 + (i * 0.1),
+                "estimated_hours": 20 + (i * 5)
+            })
+        
+        return mock_resources
     
     def _rank_and_filter_resources(self, resources: List[Dict[str, Any]], topic: str) -> List[Dict[str, Any]]:
         """Rank and filter resources based on quality metrics"""

@@ -22,7 +22,14 @@ class LearningPathUI:
     """Main UI class for the learning path generator"""
     
     def __init__(self):
-        self.path_engine = PathEngine()
+        # Check for OpenAI API key in session state or secrets
+        openai_key = None
+        if hasattr(st, 'secrets') and 'OPENAI_API_KEY' in st.secrets:
+            openai_key = st.secrets['OPENAI_API_KEY']
+        elif 'openai_api_key' in st.session_state:
+            openai_key = st.session_state.openai_api_key
+        
+        self.path_engine = PathEngine(openai_api_key=openai_key)
         self.skill_mapper = SkillMapper()
         self.input_handler = UserInputHandler()
         
@@ -31,6 +38,10 @@ class LearningPathUI:
             st.session_state.user_profile = None
         if 'learning_paths' not in st.session_state:
             st.session_state.learning_paths = []
+        if 'current_skills' not in st.session_state:
+            st.session_state.current_skills = []
+        if 'learning_goals' not in st.session_state:
+            st.session_state.learning_goals = []
     
     def run(self):
         """Main function to run the Streamlit app"""
@@ -49,11 +60,34 @@ class LearningPathUI:
         to help you achieve your professional development objectives.
         """)
         
+        # Initialize current page in session state
+        if 'current_page' not in st.session_state:
+            st.session_state.current_page = "🏠 Home"
+        
         # Sidebar navigation
         page = st.sidebar.selectbox(
             "Navigation",
-            ["🏠 Home", "👤 Profile Setup", "🎯 Generate Paths", "📊 Analytics", "ℹ️ About"]
+            ["🏠 Home", "👤 Profile Setup", "🎯 Generate Paths", "📊 Analytics", "ℹ️ About"],
+            index=["🏠 Home", "👤 Profile Setup", "🎯 Generate Paths", "📊 Analytics", "ℹ️ About"].index(st.session_state.current_page)
         )
+        
+        # Update current page
+        st.session_state.current_page = page
+        
+        # OpenAI API Key configuration (optional)
+        with st.sidebar.expander("🔧 OpenAI Configuration (Optional)", expanded=False):
+            st.markdown("Configure OpenAI API key for enhanced resource generation:")
+            api_key_input = st.text_input(
+                "OpenAI API Key", 
+                type="password",
+                value=st.session_state.get('openai_api_key', ''),
+                help="Your OpenAI API key for generating better resource links. Leave empty to use default resources."
+            )
+            if api_key_input != st.session_state.get('openai_api_key', ''):
+                st.session_state.openai_api_key = api_key_input
+                # Reinitialize path engine with new API key
+                self.path_engine = PathEngine(openai_api_key=api_key_input)
+                st.success("API key updated!")
         
         if page == "🏠 Home":
             self.show_home_page()
@@ -93,7 +127,12 @@ class LearningPathUI:
             col_a, col_b = st.columns(2)
             with col_a:
                 if st.button("🆕 Create New Profile", type="primary"):
+                    # Clear all profile-related session state
                     st.session_state.user_profile = None
+                    st.session_state.current_skills = []
+                    st.session_state.learning_goals = []
+                    st.session_state.learning_paths = []
+                    st.session_state.current_page = "👤 Profile Setup"
                     st.rerun()
             with col_b:
                 if st.button("📋 Load Sample Profile"):
@@ -343,58 +382,83 @@ class LearningPathUI:
         # Learning modules and steps
         st.markdown("### 📚 Learning Modules")
         
+        if not hasattr(path, 'modules') or not path.modules:
+            st.warning("No learning modules found for this path.")
+            return
+            
         for module_idx, module in enumerate(path.modules, 1):
-            with st.expander(f"📖 Module {module_idx}: {module.module_name}", expanded=module_idx==1):
-                # Module overview
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.metric("Module Hours", module.estimated_hours)
-                with col2:
-                    st.metric("Difficulty", module.difficulty.name)
-                with col3:
-                    st.metric("Steps", len(module.steps))
-                
-                st.markdown(f"**Description:** {module.description}")
-                st.markdown(f"**Skills Taught:** {', '.join(module.skills_taught)}")
-                
-                if module.prerequisites:
-                    st.markdown(f"**Prerequisites:** {', '.join(module.prerequisites)}")
-                
-                # Module steps
-                st.markdown("#### 📝 Learning Steps")
-                
-                for step in module.steps:
-                    resource = step.resource
-                    with st.container():
-                        st.markdown(f"""
-                        **Step {step.step_number}: {resource.title}**
-                        
-                        📝 *{resource.description}*
-                        
-                        • **Type:** {resource.resource_type.value.title()}
-                        • **Difficulty:** {resource.difficulty.name}
-                        • **Estimated Time:** {resource.estimated_hours} hours ({step.estimated_completion_weeks} weeks)
-                        • **Cost:** ${resource.cost_usd:.2f}
-                        • **Rating:** {'⭐' * int(resource.rating)} {resource.rating}/5
-                        • **Skills:** {', '.join(resource.skills_taught)}
-                        • **Priority Score:** {step.priority_score:.1f}/10
-                        """)
-                        
-                        if resource.provider:
-                            st.markdown(f"• **Provider:** {resource.provider}")
-                        
-                        if resource.prerequisites:
-                            st.markdown(f"• **Prerequisites:** {', '.join(resource.prerequisites)}")
-                        
-                        if resource.url:
-                            st.markdown(f"• **Link:** [Access Resource]({resource.url})")
-                        
-                        # Prerequisites status
-                        if hasattr(step, 'prerequisites_met'):
-                            status = "✅ Ready" if step.prerequisites_met else "⚠️ Prerequisites needed"
-                            st.markdown(f"• **Status:** {status}")
-                        
-                        st.markdown("---")
+            # Safely get module name
+            module_name = getattr(module, 'module_name', f'Module {module_idx}')
+            try:
+                with st.expander(f"📖 Module {module_idx}: {module_name}", expanded=module_idx==1):
+                    # Module overview
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("Module Hours", getattr(module, 'estimated_hours', 0))
+                    with col2:
+                        difficulty = getattr(module, 'difficulty', None)
+                        difficulty_name = difficulty.name if difficulty and hasattr(difficulty, 'name') else 'Unknown'
+                        st.metric("Difficulty", difficulty_name)
+                    with col3:
+                        steps = getattr(module, 'steps', [])
+                        st.metric("Steps", len(steps))
+                    
+                    # Module details
+                    description = getattr(module, 'description', 'No description available')
+                    st.markdown(f"**Description:** {description}")
+                    
+                    skills_taught = getattr(module, 'skills_taught', [])
+                    if skills_taught:
+                        st.markdown(f"**Skills Taught:** {', '.join(skills_taught)}")
+                    
+                    prerequisites = getattr(module, 'prerequisites', [])
+                    if prerequisites:
+                        st.markdown(f"**Prerequisites:** {', '.join(prerequisites)}")
+                    
+                    # Module steps
+                    st.markdown("#### 📝 Learning Steps")
+                    
+                    for step in steps:
+                        resource = getattr(step, 'resource', None)
+                        if resource:
+                            with st.container():
+                                title = getattr(resource, 'title', 'Untitled Resource')
+                                description = getattr(resource, 'description', 'No description available')
+                                step_number = getattr(step, 'step_number', 1)
+                                
+                                st.markdown(f"""
+                                **Step {step_number}: {title}**
+                                
+                                📝 *{description}*
+                                """)
+                                
+                                # Resource details in columns
+                                col1, col2, col3, col4 = st.columns(4)
+                                with col1:
+                                    resource_type = getattr(resource, 'resource_type', None)
+                                    type_name = resource_type.name if resource_type and hasattr(resource_type, 'name') else 'Unknown'
+                                    st.write(f"**Type:** {type_name}")
+                                with col2:
+                                    hours = getattr(resource, 'estimated_hours', 0)
+                                    st.write(f"**Duration:** {hours}h")
+                                with col3:
+                                    cost = getattr(resource, 'cost_usd', 0)
+                                    st.write(f"**Cost:** ${cost:.2f}")
+                                with col4:
+                                    rating = getattr(resource, 'rating', 0)
+                                    st.write(f"**Rating:** {rating:.1f}/5")
+                                
+                                # Resource link
+                                url = getattr(resource, 'url', None)
+                                if url and url.startswith('http'):
+                                    st.markdown(f"🔗 [Access Resource]({url})")
+                                else:
+                                    st.info("🔗 Resource link will be generated using AI")
+                                
+                                st.markdown("---")
+            except Exception as e:
+                st.error(f"Error displaying module {module_idx}: {str(e)}")
+                continue
     
     def show_analytics(self):
         """Display analytics and insights"""
