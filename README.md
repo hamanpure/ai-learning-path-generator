@@ -4,19 +4,21 @@ An intelligent, personalized learning path generator that uses AI and machine le
 
 ## 🚀 Live Demo
 
-**Try it now:** [AI Learning Path Generator Demo](https://ai-learning-path-generator-ihndahrii5hz2yg2cu6kpq.streamlit.app/)
+**Try it now:** [AI Learning Path Generator](https://ai-learning-path-generator-mhxcupxmqpdcserucowomy.streamlit.app/)
 
-Experience the full application with interactive features, personalized learning paths, and beautiful visualizations!
+Experience the full application with interactive features, personalized learning paths, AI-powered resource recommendations, and beautiful visualizations!
 
 ## 🌟 Features
 
 - **🎯 Personalized Recommendations**: AI-powered analysis of your skill profile
 - **📚 Curated Resources**: Access to high-quality learning materials from top platforms
+- **🤖 AI Resource Generation**: FREE AI integration using Together AI (Llama 3.3 70B) for intelligent resource discovery
 - **⏱️ Time Optimization**: Realistic time estimates based on your availability
 - **💰 Budget Consideration**: Cost-effective learning path suggestions
 - **📊 Progress Analytics**: Detailed insights and tracking capabilities
-- **🎨 Interactive Web Interface**: Beautiful Streamlit-based UI
+- **🎨 Interactive Web Interface**: Beautiful Streamlit-based UI with enhanced user experience
 - **⌨️ Command Line Interface**: For developers and automation
+- **🌐 Real Working URLs**: Curated resources with verified links to educational platforms
 
 ## 🚀 Quick Start
 
@@ -27,9 +29,9 @@ Experience the full application with interactive features, personalized learning
 
 ### Installation
 
-1. **Clone or download the project**:
+1. **Clone the project**:
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/hamanpure/ai-learning-path-generator.git
    cd ai-learning-path-generator
    ```
 
@@ -135,22 +137,27 @@ The AI engine:
 - **Considers time** and budget constraints
 - **Provides confidence scores** for each recommendation
 
-## 📊 Sample Data
+## 📊 Learning Resources
 
-The system includes sample learning resources covering:
+The system includes comprehensive learning resources covering:
 
 - **Programming**: Python, JavaScript, Web Development
 - **Data Science**: Machine Learning, Data Analysis, Statistics
-- **AI/ML**: Deep Learning, Neural Networks
+- **AI/ML**: Deep Learning, Neural Networks, TensorFlow, PyTorch
 - **Databases**: SQL, NoSQL, Data Warehousing
-- **Cloud Computing**: AWS, Azure, DevOps
+- **Cloud Computing**: AWS, Azure, DevOps, Kubernetes
 
-Resources include courses from platforms like:
-- Coursera
-- Udemy
-- edX
-- Khan Academy
-- Free tutorials and documentation
+Resources include verified courses from top platforms:
+- **Coursera** - University courses and specializations
+- **Udemy** - Practical skill-based courses
+- **edX** - Academic and professional courses
+- **freeCodeCamp** - Free coding bootcamps
+- **Kaggle Learn** - Data science micro-courses
+- **Khan Academy** - Foundation courses
+- **YouTube** - Free tutorials and lectures
+- **Official Documentation** - Framework and tool guides
+
+🆓 **Free Resources Priority**: The system prioritizes free, high-quality resources to make learning accessible to everyone!
 
 ## 🔧 Customization
 
@@ -235,6 +242,15 @@ The system includes robust error handling:
 - **Graceful failures** with helpful error messages
 - **Fallback options** when resources are unavailable
 - **Data consistency** checks throughout the pipeline
+
+## 🆕 Recent Updates
+
+### Version 1.1 - AI Integration & UI Enhancements
+- ✅ **FREE AI Integration**: Added Together AI (Llama 3.3 70B) for intelligent resource generation
+- ✅ **Enhanced UI**: Fixed nested expanders issue and improved user experience
+- ✅ **Resource Quality**: Added real working URLs and verified educational links
+- ✅ **Skill Tree Enhancement**: Improved learning path generation algorithms
+- ✅ **Error Handling**: Better error handling and fallback mechanisms
 
 ## 🔮 Future Enhancements
 
