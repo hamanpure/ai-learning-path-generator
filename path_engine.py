@@ -274,7 +274,7 @@ class ResourceFetcher:
     
     def __init__(self, openai_api_key: Optional[str] = None):
         self.openai_api_key = openai_api_key
-        self.cache = {}
+        self.cache = {}  # Simple cache for resources
     
     def fetch_resources(self, topic: str, difficulty: str = "intermediate", 
                        resource_type: str = "mixed") -> List[Dict[str, Any]]:
@@ -391,12 +391,14 @@ class ResourceFetcher:
     def _scrape_resources(self, topic: str, difficulty: str) -> List[Dict[str, Any]]:
         """Scrape resources from educational platforms (mock implementation)"""
         # In a real implementation, this would scrape from educational platforms
-        # For now, return mock data
+        # For now, return mock data with real URLs
+        topic_clean = topic.lower().replace(' ', '+')
+        
         mock_resources = [
             {
                 "title": f"Complete {topic} Tutorial",
                 "description": f"Comprehensive {topic} learning resource",
-                "url": f"https://example.com/{topic.lower().replace(' ', '-')}",
+                "url": self._get_fallback_url(topic),
                 "provider": "Educational Platform",
                 "type": "tutorial",
                 "difficulty": difficulty,
@@ -407,11 +409,122 @@ class ResourceFetcher:
         return mock_resources
     
     def _get_ai_resources(self, topic: str, difficulty: str) -> List[Dict[str, Any]]:
-        """Use OpenAI to generate resource recommendations with real links"""
-        if not self.openai_api_key:
-            # Fallback to mock resources if no API key
-            return self._get_mock_ai_resources(topic, difficulty)
+        """Use AI to generate resource recommendations with real links"""
+        # Try Together AI first (free alternative)
+        if self._try_together_ai(topic, difficulty):
+            return self._try_together_ai(topic, difficulty)
         
+        # Try OpenAI if API key is available
+        if self.openai_api_key:
+            return self._try_openai(topic, difficulty)
+        
+        # Fallback to mock resources
+        return self._get_mock_ai_resources(topic, difficulty)
+    
+    def _try_together_ai(self, topic: str, difficulty: str) -> List[Dict[str, Any]]:
+        """Use Together AI (free) to generate resource recommendations"""
+        try:
+            import requests
+            import json
+            
+            # Together AI free endpoint - No API key needed for the free model
+            url = "https://api.together.xyz/v1/chat/completions"
+            headers = {
+                "Content-Type": "application/json"
+            }
+            
+            prompt = f"""You are an educational resource curator. Generate exactly 3 real, working educational resources for learning "{topic}" at {difficulty} level.
+
+IMPORTANT: Provide ONLY valid JSON array format. No explanation text.
+
+For each resource, use these exact field names:
+- title: Real course/tutorial name
+- description: Brief description (max 100 chars)
+- url: Real working URL to educational platforms
+- provider: Platform name (YouTube, Coursera, edX, Khan Academy, freeCodeCamp, etc.)
+- type: course, tutorial, or project  
+- estimated_hours: Number between 10-50
+- rating: Number between 4.0-5.0
+
+Focus on popular educational platforms with real courses. Example topics to search: Python, Machine Learning, Data Science, Web Development.
+
+JSON array only:"""
+
+            data = {
+                "model": "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free",
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 800,
+                "temperature": 0.1
+            }
+            
+            response = requests.post(url, headers=headers, json=data, timeout=15)
+            
+            if response.status_code == 200:
+                result = response.json()
+                content = result['choices'][0]['message']['content'].strip()
+                
+                # Try to extract and parse JSON
+                try:
+                    # Look for JSON array
+                    start_idx = content.find('[')
+                    end_idx = content.rfind(']') + 1
+                    
+                    if start_idx != -1 and end_idx != 0:
+                        json_str = content[start_idx:end_idx]
+                        ai_resources = json.loads(json_str)
+                        
+                        # Validate and clean the resources
+                        validated_resources = []
+                        for resource in ai_resources:
+                            if isinstance(resource, dict) and all(key in resource for key in ['title', 'url']):
+                                validated_resource = {
+                                    'title': str(resource.get('title', f'{topic} Course')),
+                                    'description': str(resource.get('description', f'Learn {topic} effectively')),
+                                    'url': str(resource.get('url', self._get_fallback_url(topic))),
+                                    'provider': str(resource.get('provider', 'Educational Platform')),
+                                    'type': str(resource.get('type', 'course')),
+                                    'difficulty': difficulty,
+                                    'rating': float(resource.get('rating', 4.2)),
+                                    'estimated_hours': int(resource.get('estimated_hours', 25))
+                                }
+                                validated_resources.append(validated_resource)
+                        
+                        if validated_resources:
+                            logger.info(f"Generated {len(validated_resources)} AI resources for {topic} using Together AI")
+                            return validated_resources
+                            
+                except json.JSONDecodeError as e:
+                    logger.error(f"JSON parsing error: {e}")
+                    
+        except Exception as e:
+            logger.error(f"Error using Together AI: {str(e)}")
+        
+        return []
+    
+    def _get_fallback_url(self, topic: str) -> str:
+        """Generate fallback URLs for topics"""
+        topic_clean = topic.lower().replace(' ', '+').replace('-', '+')
+        fallback_urls = {
+            'python': 'https://www.freecodecamp.org/learn/scientific-computing-with-python/',
+            'machine learning': 'https://www.coursera.org/learn/machine-learning',
+            'data science': 'https://www.kaggle.com/learn/intro-to-machine-learning',
+            'web development': 'https://www.freecodecamp.org/learn/responsive-web-design/',
+            'javascript': 'https://www.freecodecamp.org/learn/javascript-algorithms-and-data-structures/',
+            'react': 'https://react.dev/learn',
+            'sql': 'https://www.w3schools.com/sql/',
+            'data analysis': 'https://www.kaggle.com/learn/pandas'
+        }
+        
+        # Check for exact matches first
+        for key, url in fallback_urls.items():
+            if key in topic.lower():
+                return url
+        
+        # Default fallback URLs
+        return f"https://www.coursera.org/search?query={topic_clean}"
+    
+    def _try_openai(self, topic: str, difficulty: str) -> List[Dict[str, Any]]:
+        """Use OpenAI to generate resource recommendations with real links"""
         try:
             from openai import OpenAI
             client = OpenAI(api_key=self.openai_api_key)
@@ -470,48 +583,180 @@ class ResourceFetcher:
                     return validated_resources
             
         except Exception as e:
-            logger.error(f"Error generating AI resources: {str(e)}")
+            logger.error(f"Error generating OpenAI resources: {str(e)}")
         
-        # Fallback to mock resources
-        return self._get_mock_ai_resources(topic, difficulty)
+        return []
     
     def _get_mock_ai_resources(self, topic: str, difficulty: str) -> List[Dict[str, Any]]:
-        """Fallback mock AI resources when OpenAI is not available"""
-        # Generate realistic resource URLs based on topic
-        mock_resources = []
+        """Fallback mock AI resources with real working URLs"""
+        topic_lower = topic.lower()
         
-        # Define real educational platforms and their URL patterns
-        platforms = [
-            {
-                "name": "freeCodeCamp",
-                "url_pattern": f"https://www.freecodecamp.org/learn/{topic.lower().replace(' ', '-')}",
-                "type": "tutorial"
-            },
-            {
-                "name": "Khan Academy", 
-                "url_pattern": f"https://www.khanacademy.org/computing/{topic.lower().replace(' ', '-')}",
-                "type": "course"
-            },
-            {
-                "name": "Coursera",
-                "url_pattern": f"https://www.coursera.org/search?query={topic.replace(' ', '%20')}",
-                "type": "course"
-            }
-        ]
+        # Real educational resources mapping
+        real_resources = {
+            'python': [
+                {
+                    "title": "Python for Everybody Specialization",
+                    "description": "Learn to Program and Analyze Data with Python from University of Michigan",
+                    "url": "https://www.coursera.org/specializations/python",
+                    "provider": "Coursera",
+                    "type": "course",
+                    "rating": 4.8,
+                    "estimated_hours": 35
+                },
+                {
+                    "title": "Learn Python - freeCodeCamp",
+                    "description": "Full Python course for beginners covering basics to advanced topics",
+                    "url": "https://www.freecodecamp.org/learn/scientific-computing-with-python/",
+                    "provider": "freeCodeCamp",
+                    "type": "course",
+                    "rating": 4.7,
+                    "estimated_hours": 45
+                },
+                {
+                    "title": "Python Tutorial - W3Schools",
+                    "description": "Interactive Python tutorial with examples and exercises",
+                    "url": "https://www.w3schools.com/python/",
+                    "provider": "W3Schools",
+                    "type": "tutorial",
+                    "rating": 4.5,
+                    "estimated_hours": 25
+                }
+            ],
+            'machine learning': [
+                {
+                    "title": "Machine Learning Course by Andrew Ng",
+                    "description": "Stanford's famous machine learning course by Andrew Ng",
+                    "url": "https://www.coursera.org/learn/machine-learning",
+                    "provider": "Coursera",
+                    "type": "course",
+                    "rating": 4.9,
+                    "estimated_hours": 55
+                },
+                {
+                    "title": "Intro to Machine Learning - Kaggle",
+                    "description": "Hands-on machine learning course with real datasets",
+                    "url": "https://www.kaggle.com/learn/intro-to-machine-learning",
+                    "provider": "Kaggle",
+                    "type": "course",
+                    "rating": 4.6,
+                    "estimated_hours": 25
+                },
+                {
+                    "title": "Machine Learning A-Z Course",
+                    "description": "Complete machine learning course with Python and R",
+                    "url": "https://www.udemy.com/course/machinelearning/",
+                    "provider": "Udemy",
+                    "type": "course",
+                    "rating": 4.5,
+                    "estimated_hours": 40
+                }
+            ],
+            'data science': [
+                {
+                    "title": "Data Science Specialization - Johns Hopkins",
+                    "description": "Comprehensive data science program from Johns Hopkins University",
+                    "url": "https://www.coursera.org/specializations/jhu-data-science",
+                    "provider": "Coursera",
+                    "type": "course",
+                    "rating": 4.6,
+                    "estimated_hours": 50
+                },
+                {
+                    "title": "Python for Data Science - Kaggle",
+                    "description": "Learn pandas, matplotlib, and data manipulation techniques",
+                    "url": "https://www.kaggle.com/learn/pandas",
+                    "provider": "Kaggle",
+                    "type": "course",
+                    "rating": 4.7,
+                    "estimated_hours": 30
+                },
+                {
+                    "title": "Data Science Path - DataCamp",
+                    "description": "Interactive data science learning with hands-on projects",
+                    "url": "https://www.datacamp.com/tracks/data-scientist-with-python",
+                    "provider": "DataCamp",
+                    "type": "course",
+                    "rating": 4.4,
+                    "estimated_hours": 45
+                }
+            ],
+            'web development': [
+                {
+                    "title": "Responsive Web Design - freeCodeCamp",
+                    "description": "Learn HTML, CSS, and responsive design principles",
+                    "url": "https://www.freecodecamp.org/learn/responsive-web-design/",
+                    "provider": "freeCodeCamp",
+                    "type": "course",
+                    "rating": 4.8,
+                    "estimated_hours": 35
+                },
+                {
+                    "title": "The Complete Web Developer Course",
+                    "description": "Full-stack web development from beginner to advanced",
+                    "url": "https://www.udemy.com/course/the-complete-web-development-bootcamp/",
+                    "provider": "Udemy",
+                    "type": "course",
+                    "rating": 4.7,
+                    "estimated_hours": 65
+                },
+                {
+                    "title": "JavaScript Algorithms and Data Structures",
+                    "description": "Learn JavaScript fundamentals and algorithmic thinking",
+                    "url": "https://www.freecodecamp.org/learn/javascript-algorithms-and-data-structures/",
+                    "provider": "freeCodeCamp",
+                    "type": "course",
+                    "rating": 4.6,
+                    "estimated_hours": 40
+                }
+            ]
+        }
         
-        for i, platform in enumerate(platforms):
-            mock_resources.append({
-                "title": f"{platform['name']} - {topic} {difficulty} Course",
-                "description": f"Comprehensive {difficulty.lower()} level {topic} course from {platform['name']}",
-                "url": platform["url_pattern"],
-                "provider": platform["name"],
-                "type": platform["type"],
-                "difficulty": difficulty,
-                "rating": 4.2 + (i * 0.1),
-                "estimated_hours": 20 + (i * 5)
-            })
+        # Find matching resources
+        matched_resources = []
+        for key, resources in real_resources.items():
+            if key in topic_lower or any(word in topic_lower for word in key.split()):
+                matched_resources = resources[:3]  # Take first 3
+                break
         
-        return mock_resources
+        # If no match found, create generic resources
+        if not matched_resources:
+            topic_clean = topic.replace(' ', '%20')
+            matched_resources = [
+                {
+                    "title": f"{topic} Course - Coursera",
+                    "description": f"Comprehensive {topic} course from top universities",
+                    "url": f"https://www.coursera.org/search?query={topic_clean}",
+                    "provider": "Coursera",
+                    "type": "course",
+                    "rating": 4.5,
+                    "estimated_hours": 30
+                },
+                {
+                    "title": f"{topic} Tutorial - YouTube",
+                    "description": f"Free {topic} tutorial videos and lectures",
+                    "url": f"https://www.youtube.com/results?search_query={topic_clean}+tutorial",
+                    "provider": "YouTube",
+                    "type": "tutorial",
+                    "rating": 4.3,
+                    "estimated_hours": 25
+                },
+                {
+                    "title": f"{topic} Documentation",
+                    "description": f"Official {topic} documentation and guides",
+                    "url": f"https://www.google.com/search?q={topic_clean}+official+documentation",
+                    "provider": "Official Docs",
+                    "type": "documentation",
+                    "rating": 4.7,
+                    "estimated_hours": 20
+                }
+            ]
+        
+        # Add difficulty level to each resource
+        for resource in matched_resources:
+            resource['difficulty'] = difficulty
+        
+        logger.info(f"Generated {len(matched_resources)} mock resources for {topic}")
+        return matched_resources
     
     def _rank_and_filter_resources(self, resources: List[Dict[str, Any]], topic: str) -> List[Dict[str, Any]]:
         """Rank and filter resources based on quality metrics"""
@@ -826,19 +1071,29 @@ class PathEngine:
         )
     
     def _create_fallback_resource(self, resource_id: str) -> LearningResource:
-        """Create a basic fallback resource"""
+        """Create a basic fallback resource with working URL"""
+        # Extract topic from resource_id if possible
+        topic = "programming"  # default
+        if "data" in resource_id.lower():
+            topic = "data analysis"
+        elif "machine" in resource_id.lower():
+            topic = "machine learning"
+        elif "python" in resource_id.lower():
+            topic = "python"
+        
         return LearningResource(
             id=resource_id,
-            title="Basic Learning Resource",
-            description="Foundational learning material",
+            title="Complete Data Analysis Tutorial",
+            description="Comprehensive Data Analysis learning resource",
             resource_type=ResourceType.TUTORIAL,
             difficulty=Difficulty.INTERMEDIATE,
-            estimated_hours=20,
-            skills_taught=["General Skills"],
+            estimated_hours=30,
+            skills_taught=["Data Analysis"],
             prerequisites=[],
             cost_usd=0.0,
-            rating=4.0,
-            provider="Generic"
+            rating=4.5,
+            url="https://www.kaggle.com/learn/pandas",
+            provider="Educational Platform"
         )
     
     def generate_multiple_paths(self, user_profile: UserProfile) -> List[LearningPath]:
@@ -990,6 +1245,7 @@ class PathEngine:
                 prerequisites=["Python", "Statistics"],
                 cost_usd=89.99,
                 rating=4.5,
+                url="https://www.udemy.com/course/machinelearning/",
                 provider="Udemy",
                 tags=["hands-on", "practical", "comprehensive"]
             ),
@@ -1004,6 +1260,7 @@ class PathEngine:
                 prerequisites=[],
                 cost_usd=0,
                 rating=4.8,
+                url="https://www.coursera.org/specializations/python",
                 provider="Coursera",
                 tags=["beginner-friendly", "university", "free"]
             ),
@@ -1018,6 +1275,7 @@ class PathEngine:
                 prerequisites=["Python"],
                 cost_usd=0,
                 rating=4.3,
+                url="https://www.kaggle.com/learn/pandas",
                 tags=["project-based", "pandas", "free"]
             ),
             LearningResource(
@@ -1031,6 +1289,7 @@ class PathEngine:
                 prerequisites=["Machine Learning", "Python", "Statistics"],
                 cost_usd=39.99,
                 rating=4.9,
+                url="https://www.coursera.org/specializations/deep-learning",
                 provider="Coursera",
                 tags=["andrew-ng", "comprehensive", "theory"]
             ),
@@ -1045,6 +1304,7 @@ class PathEngine:
                 prerequisites=[],
                 cost_usd=0,
                 rating=4.4,
+                url="https://www.w3schools.com/sql/",
                 tags=["sql", "databases", "free"]
             ),
             # Add more resources for web development
@@ -1059,6 +1319,7 @@ class PathEngine:
                 prerequisites=["JavaScript", "HTML", "CSS"],
                 cost_usd=69.99,
                 rating=4.6,
+                url="https://www.udemy.com/course/react-the-complete-guide-incl-redux/",
                 provider="Udemy",
                 tags=["react", "frontend", "modern"]
             ),
@@ -1073,6 +1334,7 @@ class PathEngine:
                 prerequisites=["HTML", "CSS"],
                 cost_usd=49.99,
                 rating=4.7,
+                url="https://www.freecodecamp.org/learn/javascript-algorithms-and-data-structures/",
                 provider="Udemy",
                 tags=["javascript", "fundamentals", "comprehensive"]
             )

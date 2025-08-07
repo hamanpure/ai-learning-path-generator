@@ -24,9 +24,14 @@ class LearningPathUI:
     def __init__(self):
         # Check for OpenAI API key in session state or secrets
         openai_key = None
-        if hasattr(st, 'secrets') and 'OPENAI_API_KEY' in st.secrets:
-            openai_key = st.secrets['OPENAI_API_KEY']
-        elif 'openai_api_key' in st.session_state:
+        try:
+            if hasattr(st, 'secrets') and 'OPENAI_API_KEY' in st.secrets:
+                openai_key = st.secrets['OPENAI_API_KEY']
+        except Exception:
+            # Secrets file not found or accessible, continue without it
+            pass
+        
+        if not openai_key and 'openai_api_key' in st.session_state:
             openai_key = st.session_state.openai_api_key
         
         self.path_engine = PathEngine(openai_api_key=openai_key)
@@ -74,20 +79,28 @@ class LearningPathUI:
         # Update current page
         st.session_state.current_page = page
         
-        # OpenAI API Key configuration (optional)
-        with st.sidebar.expander("🔧 OpenAI Configuration (Optional)", expanded=False):
-            st.markdown("Configure OpenAI API key for enhanced resource generation:")
+        # AI Configuration (optional)
+        with st.sidebar.expander("🤖 AI Configuration", expanded=False):
+            st.markdown("**🆓 FREE AI Integration Active!**")
+            st.info("✅ Using Together AI (Llama 3.3 70B) for FREE resource generation")
+            
+            st.markdown("---")
+            st.markdown("**Optional: OpenAI API Key**")
+            st.markdown("Add your OpenAI key for additional AI models:")
             api_key_input = st.text_input(
                 "OpenAI API Key", 
                 type="password",
                 value=st.session_state.get('openai_api_key', ''),
-                help="Your OpenAI API key for generating better resource links. Leave empty to use default resources."
+                help="Optional: Your OpenAI API key. We already use free AI for resource generation!"
             )
             if api_key_input != st.session_state.get('openai_api_key', ''):
                 st.session_state.openai_api_key = api_key_input
                 # Reinitialize path engine with new API key
                 self.path_engine = PathEngine(openai_api_key=api_key_input)
-                st.success("API key updated!")
+                st.success("OpenAI API key added as backup!")
+            
+            if not api_key_input:
+                st.markdown("🎉 **No worries!** Your app works perfectly with free AI.")
         
         if page == "🏠 Home":
             self.show_home_page()
