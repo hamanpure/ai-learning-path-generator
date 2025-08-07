@@ -403,72 +403,78 @@ class LearningPathUI:
             # Safely get module name
             module_name = getattr(module, 'module_name', f'Module {module_idx}')
             try:
-                with st.expander(f"📖 Module {module_idx}: {module_name}", expanded=module_idx==1):
-                    # Module overview
-                    col1, col2, col3 = st.columns(3)
-                    with col1:
-                        st.metric("Module Hours", getattr(module, 'estimated_hours', 0))
-                    with col2:
-                        difficulty = getattr(module, 'difficulty', None)
-                        difficulty_name = difficulty.name if difficulty and hasattr(difficulty, 'name') else 'Unknown'
-                        st.metric("Difficulty", difficulty_name)
-                    with col3:
-                        steps = getattr(module, 'steps', [])
-                        st.metric("Steps", len(steps))
-                    
-                    # Module details
-                    description = getattr(module, 'description', 'No description available')
-                    st.markdown(f"**Description:** {description}")
-                    
-                    skills_taught = getattr(module, 'skills_taught', [])
-                    if skills_taught:
-                        st.markdown(f"**Skills Taught:** {', '.join(skills_taught)}")
-                    
-                    prerequisites = getattr(module, 'prerequisites', [])
-                    if prerequisites:
-                        st.markdown(f"**Prerequisites:** {', '.join(prerequisites)}")
-                    
-                    # Module steps
-                    st.markdown("#### 📝 Learning Steps")
-                    
-                    for step in steps:
-                        resource = getattr(step, 'resource', None)
-                        if resource:
-                            with st.container():
-                                title = getattr(resource, 'title', 'Untitled Resource')
-                                description = getattr(resource, 'description', 'No description available')
-                                step_number = getattr(step, 'step_number', 1)
-                                
-                                st.markdown(f"""
-                                **Step {step_number}: {title}**
-                                
-                                📝 *{description}*
-                                """)
-                                
-                                # Resource details in columns
-                                col1, col2, col3, col4 = st.columns(4)
-                                with col1:
-                                    resource_type = getattr(resource, 'resource_type', None)
-                                    type_name = resource_type.name if resource_type and hasattr(resource_type, 'name') else 'Unknown'
-                                    st.write(f"**Type:** {type_name}")
-                                with col2:
-                                    hours = getattr(resource, 'estimated_hours', 0)
-                                    st.write(f"**Duration:** {hours}h")
-                                with col3:
-                                    cost = getattr(resource, 'cost_usd', 0)
-                                    st.write(f"**Cost:** ${cost:.2f}")
-                                with col4:
-                                    rating = getattr(resource, 'rating', 0)
-                                    st.write(f"**Rating:** {rating:.1f}/5")
-                                
-                                # Resource link
-                                url = getattr(resource, 'url', None)
-                                if url and url.startswith('http'):
-                                    st.markdown(f"🔗 [Access Resource]({url})")
-                                else:
-                                    st.info("🔗 Resource link will be generated using AI")
-                                
-                                st.markdown("---")
+                # Use container instead of nested expander
+                st.markdown(f"#### 📖 Module {module_idx}: {module_name}")
+                
+                # Module overview
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Module Hours", getattr(module, 'estimated_hours', 0))
+                with col2:
+                    difficulty = getattr(module, 'difficulty', None)
+                    difficulty_name = difficulty.name if difficulty and hasattr(difficulty, 'name') else 'Unknown'
+                    st.metric("Difficulty", difficulty_name)
+                with col3:
+                    steps = getattr(module, 'steps', [])
+                    st.metric("Steps", len(steps))
+                
+                # Module details
+                description = getattr(module, 'description', 'No description available')
+                st.markdown(f"**Description:** {description}")
+                
+                skills_taught = getattr(module, 'skills_taught', [])
+                if skills_taught:
+                    st.markdown(f"**Skills Taught:** {', '.join(skills_taught)}")
+                
+                prerequisites = getattr(module, 'prerequisites', [])
+                if prerequisites:
+                    st.markdown(f"**Prerequisites:** {', '.join(prerequisites)}")
+                
+                # Module steps
+                st.markdown("##### 📝 Learning Steps")
+                
+                for step in steps:
+                    resource = getattr(step, 'resource', None)
+                    if resource:
+                        with st.container():
+                            title = getattr(resource, 'title', 'Untitled Resource')
+                            description = getattr(resource, 'description', 'No description available')
+                            step_number = getattr(step, 'step_number', 1)
+                            
+                            st.markdown(f"""
+                            **Step {step_number}: {title}**
+                            
+                            📝 *{description}*
+                            """)
+                            
+                            # Resource details in columns
+                            col1, col2, col3, col4 = st.columns(4)
+                            with col1:
+                                resource_type = getattr(resource, 'resource_type', None)
+                                type_name = resource_type.name if resource_type and hasattr(resource_type, 'name') else 'Unknown'
+                                st.write(f"**Type:** {type_name}")
+                            with col2:
+                                hours = getattr(resource, 'estimated_hours', 0)
+                                st.write(f"**Duration:** {hours}h")
+                            with col3:
+                                cost = getattr(resource, 'cost_usd', 0)
+                                st.write(f"**Cost:** ${cost:.2f}")
+                            with col4:
+                                rating = getattr(resource, 'rating', 0)
+                                st.write(f"**Rating:** {rating:.1f}/5")
+                            
+                            # Resource link
+                            url = getattr(resource, 'url', None)
+                            if url and url.startswith('http'):
+                                st.markdown(f"🔗 [Access Resource]({url})")
+                            else:
+                                st.info("🔗 Resource link will be generated using AI")
+                            
+                            st.markdown("---")
+                
+                # Add separator between modules
+                st.markdown("---")
+                
             except Exception as e:
                 st.error(f"Error displaying module {module_idx}: {str(e)}")
                 continue

@@ -21,6 +21,7 @@ from user_profile import UserProfile, UserSkill, LearningGoal, SkillLevel, Skill
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Resource Types
 class ResourceType(Enum):
     """Types of learning resources available"""
     COURSE = "course"
