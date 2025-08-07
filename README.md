@@ -2,6 +2,12 @@
 
 An intelligent, personalized learning path generator that uses AI and machine learning to create customized educational roadmaps based on your current skills, goals, and constraints.
 
+## 🚀 Live Demo
+
+**Try it now:** [AI Learning Path Generator Demo](https://ai-learning-path-generator-ihndahrii5hz2yg2cu6kpq.streamlit.app/)
+
+Experience the full application with interactive features, personalized learning paths, and beautiful visualizations!
+
 ## 🌟 Features
 
 - **🎯 Personalized Recommendations**: AI-powered analysis of your skill profile
@@ -273,7 +279,6 @@ Having issues or questions?
 
 For additional support:
 - Open an issue on the repository
-- Contact: support@learningpathgen.ai
 
 ## 🏃‍♀️ Quick Examples
 
